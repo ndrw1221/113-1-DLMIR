@@ -1,0 +1,44 @@
+best_rf_model:
+Grid Search, No feature scaling
+
+Best parameters: {'class_weight': None, 'max_depth': None, 'min_samples_leaf': 1, 'min_samples_split': 2, 'n_estimators': 200}
+Validation accuracy: 0.5208
+
+Test Set Top-1 Accuracy: 51.20%
+Test Set Top-3 Accuracy: 81.52%
+Confusion Matrix on Test Set:
+[[427   0   6  77 198  75  22   1  12  14  11]
+ [ 44 166  14   6   1   0   0   5   0   0  33]
+ [  4   0  83   7   1  12  38  24   0  11   0]
+ [ 84  25  16 201 198  81  16   0  25   5   1]
+ [ 78  31   8 113 441  28  19   4  15  18  11]
+ [ 12   2   1  58  14  88  11   5   2   8   1]
+ [ 31   5  21  11   7  16 276  29   2  55  49]
+ [  4  38  22  30   2   2   1  77  47  11   1]
+ [ 40   1   3   9   2   1   0   0 244   6   0]
+ [  0   0   0   0   0   0   0   0   0   0   0]
+ [ 15   0   0   7   1   0   3  20   1   0  94]]
+Classification Report on Test Set:
+/home/ndrw1221/miniconda3/envs/dlmir-hw0-task2/lib/python3.10/site-packages/sklearn/metrics/_classification.py:1531: UndefinedMetricWarning: Recall is ill-defined and being set to 0.0 in labels with no true samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, f"{metric.capitalize()} is", len(result))
+/home/ndrw1221/miniconda3/envs/dlmir-hw0-task2/lib/python3.10/site-packages/sklearn/metrics/_classification.py:1531: UndefinedMetricWarning: Recall is ill-defined and being set to 0.0 in labels with no true samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, f"{metric.capitalize()} is", len(result))
+/home/ndrw1221/miniconda3/envs/dlmir-hw0-task2/lib/python3.10/site-packages/sklearn/metrics/_classification.py:1531: UndefinedMetricWarning: Recall is ill-defined and being set to 0.0 in labels with no true samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, f"{metric.capitalize()} is", len(result))
+              precision    recall  f1-score   support
+
+           0       0.58      0.51      0.54       843
+           1       0.62      0.62      0.62       269
+           2       0.48      0.46      0.47       180
+           3       0.39      0.31      0.34       652
+           4       0.51      0.58      0.54       766
+           5       0.29      0.44      0.35       202
+           6       0.72      0.55      0.62       502
+           7       0.47      0.33      0.39       235
+           8       0.70      0.80      0.75       306
+           9       0.00      0.00      0.00         0
+          10       0.47      0.67      0.55       141
+
+    accuracy                           0.51      4096
+   macro avg       0.47      0.48      0.47      4096
+weighted avg       0.53      0.51      0.52      4096

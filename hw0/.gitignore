@@ -1,3 +1,6 @@
 *.wav
 *.npy
+*.joblib
 __pycache__/
+features/
+models/
