@@ -4,7 +4,7 @@ from pathlib import Path
 from tqdm import tqdm
 from utils import load_labels, extract_features
 
-BASE_PATH = Path("path/to/your/nsynth-dataset")
+BASE_PATH = Path("path/to/your/nsynth-dataset")  # Correct the path
 TEST_PATH = BASE_PATH / "nsynth-test"
 FEATURE_VERSION = "v1"
 
@@ -35,7 +35,7 @@ def process_dataset(audio_dir, labels):
 # Process datasets with progress bars
 X_test, y_test = process_dataset(TEST_PATH / "audio", test_labels)
 
-os.makedirs("features", exist_ok=True)  
+os.makedirs("features", exist_ok=True)
 
 # Save the processed features and labels
 np.save(f"features/X_test_{FEATURE_VERSION}.npy", X_test)

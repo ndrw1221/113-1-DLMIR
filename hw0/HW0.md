@@ -22,7 +22,11 @@ pip install -r requirements.txt
 First, correct the path to your local Nsynth dataset in `data_repparation_inference.py` on line 7:
 
 ```python
-BASE_PATH = Path("path/to/your/nsynth-dataset")
+# data_repparation_inference.py
+
+BASE_PATH = Path("path/to/your/nsynth-dataset")  # Correct the path
+TEST_PATH = BASE_PATH / "nsynth-test"
+FEATURE_VERSION = "v1"
 ```
 
 Then, run 
