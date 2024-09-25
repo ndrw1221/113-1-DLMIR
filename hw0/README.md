@@ -1,14 +1,16 @@
-# Report
+# DLMIR HW0
+
+## Report
 
 [Link to report](https://docs.google.com/presentation/d/1PByyBUmborBJNQWZepZ4sHU4tKR5zV2Ln2gSIOJ536Q/edit?usp=sharing)
 
-# Inference Guide
+## Inference Guide
 
 This is the inference guide for **task2** and **task3** of hw0.
 
-## Task 2
+### Task 2
 
-### 1. Environment Setup
+#### 1. Environment Setup
 
 ```bash
 cd task2/
@@ -17,7 +19,7 @@ conda activate YOUR_ENV_NAME
 pip install -r requirements.txt
 ```
 
-### 2. Testing Data Preparation
+#### 2. Testing Data Preparation
 
 First, correct the path to your local Nsynth dataset in `data_repparation_inference.py` on line 7:
 
@@ -37,7 +39,7 @@ python data_preparation_inference.py
 
 You will get the extracted features from the testing data, saved as `.npy` in the `feature/` folder.
 
-### 3. Evalutaion
+#### 3. Evalutaion
 
 Make sure your folder sturcture is as follows before running evaluation:
 
@@ -61,9 +63,9 @@ python evaluate.py
 
 and you should see the result.
 
-## Task3
+### Task3
 
-### 1. Environment Setup
+#### 1. Environment Setup
 
 ```bash
 cd task3/sota-music-tagging-models
@@ -71,7 +73,7 @@ conda env create --name YOUR_ENV_NAME  --file environment.yml
 conda activate --name YOUR_ENV_NAME
 ```
 
-### 2. Data Preparation
+#### 2. Data Preparation
 
 ```bash
 cd preprocessing/
@@ -95,7 +97,7 @@ YOUR_TEST_DATA_PATH/
 ```
 
 
-### 3. Evaluate
+#### 3. Evaluate
 
 Make sure your have the necessary files in the correct folder structure before running evaluation:
 
