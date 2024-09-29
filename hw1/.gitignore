@@ -1,2 +1,5 @@
 __pycache__/
+runs/
+
 *.pyc
+model.pth
