@@ -1,5 +1,6 @@
 import torch
 import time
+import os
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import precision_score, recall_score, f1_score
 
@@ -16,6 +17,7 @@ class Trainer:
         num_epochs,
         save_path,
         log_dir="runs",
+        run_name=None,
     ):
         self.model = model
         self.optimizer = optimizer
@@ -26,8 +28,17 @@ class Trainer:
         self.num_epochs = num_epochs
         self.save_path = save_path
 
+        # Create a unique log directory for each run
+        if run_name is None:
+            import pytz
+            from datetime import datetime
+
+            tz = pytz.timezone("Asia/Taipei")
+            run_name = datetime.now(tz).strftime("%Y-%m-%d_%H-%M-%S")
+        self.log_dir = os.path.join(log_dir, run_name)
+
         # Initialize the SummaryWriter
-        self.writer = SummaryWriter(log_dir=log_dir)
+        self.writer = SummaryWriter(log_dir=self.log_dir)
 
     def train(self):
         best_val_loss = float("inf")

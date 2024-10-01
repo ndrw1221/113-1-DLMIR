@@ -49,6 +49,9 @@ def parse_args():
         default=24000,
         help="Sampling rate of the audio data.",
     )
+    parser.add_argument(
+        "--run_name", type=str, default=None, help="Unique name for the training run."
+    )
     return parser.parse_args()
 
 
@@ -86,6 +89,16 @@ def main():
     )
     criterion = torch.nn.BCEWithLogitsLoss()
 
+    # Create a unique run name if not provided
+    if args.run_name is None:
+        import pytz
+        from datetime import datetime
+
+        tz = pytz.timezone("Asia/Taipei")
+        run_name = datetime.now(tz).strftime("%Y-%m-%d_%H-%M-%S")
+    else:
+        run_name = args.run_name
+
     # Initialize Trainer
     trainer = Trainer(
         model=model,
@@ -96,6 +109,7 @@ def main():
         val_loader=val_loader,
         num_epochs=args.num_epochs,
         save_path=args.save_path,
+        run_name=run_name,
     )
 
     # Start training
