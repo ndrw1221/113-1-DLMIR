@@ -21,7 +21,7 @@ class Model(nn.Module):
         if finetune_strategy == "classifier only":
             for param in self.feature_extractor.parameters():
                 param.requires_grad = False
-        elif finetune_strategy == "selective":
+        elif finetune_strategy == "partial":
             # Freeze all layers first
             for param in self.feature_extractor.parameters():
                 param.requires_grad = False

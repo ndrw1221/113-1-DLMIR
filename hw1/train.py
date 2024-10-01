@@ -57,7 +57,7 @@ def parse_args():
         type=str,
         default="classifier only",
         help="strategy for finetune the model.",
-        choices=["classifier only", "full", "selective"],
+        choices=["classifier only", "full", "partial"],
     )
     return parser.parse_args()
 
