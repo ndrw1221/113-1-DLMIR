@@ -4,7 +4,9 @@ from transformers import AutoModel, Wav2Vec2FeatureExtractor
 
 
 class Model(nn.Module):
-    def __init__(self, num_classes=9, sampling_rate=24000, full_finetune=False):
+    def __init__(
+        self, num_classes=9, sampling_rate=24000, finetune_strategy="classifier only"
+    ):
         super(Model, self).__init__()
         # Load the pre-trained model and processor
         self.processor = Wav2Vec2FeatureExtractor.from_pretrained(
@@ -16,9 +18,26 @@ class Model(nn.Module):
         self.sampling_rate = sampling_rate
 
         # Freeze the pre-trained model's parameters
-        if not full_finetune:
+        if finetune_strategy == "classifier only":
             for param in self.feature_extractor.parameters():
                 param.requires_grad = False
+        elif finetune_strategy == "selective":
+            # Freeze all layers first
+            for param in self.feature_extractor.parameters():
+                param.requires_grad = False
+
+            # Unfreeze the last 6 encoder layers for fine-tuning
+            # Assuming the model has 24 encoder layers, unfreeze layers 18 to 23
+            for layer_num in range(18, 24):
+                for param in self.feature_extractor.encoder.layers[
+                    layer_num
+                ].parameters():
+                    param.requires_grad = True
+
+        elif finetune_strategy == "full":
+            pass
+        else:
+            raise ValueError("Invalid finetune strategy.")
 
         self.pooling = nn.AdaptiveAvgPool1d(1)  # Pool over the sequence length
 

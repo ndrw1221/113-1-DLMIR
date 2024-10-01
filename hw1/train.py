@@ -53,10 +53,11 @@ def parse_args():
         "--run_name", type=str, default=None, help="Unique name for the training run."
     )
     parser.add_argument(
-        "--full_finetune",
-        type=bool,
-        default=False,
-        help="Whether to full finetune the model.",
+        "--finetune_strategy",
+        type=str,
+        default="classifier only",
+        help="strategy for finetune the model.",
+        choices=["classifier only", "full", "selective"],
     )
     return parser.parse_args()
 
@@ -89,9 +90,16 @@ def main():
     model = Model(
         num_classes=args.num_classes,
         sampling_rate=args.sampling_rate,
-        full_finetune=args.full_finetune,
+        finetune_strategy=args.finetune_strategy,
     )
     model.to(device)
+
+    # for name, param in model.named_parameters():
+    #     print(name, param.requires_grad)
+
+    # import pdb
+
+    # pdb.set_trace()
 
     # Initialize optimizer and criterion
     optimizer = torch.optim.Adam(
