@@ -2,4 +2,6 @@ __pycache__/
 runs/
 
 *.pyc
+*.pth
+*.sh
 model.pth
