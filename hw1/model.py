@@ -41,7 +41,6 @@ class Model(nn.Module):
 
         self.pooling = nn.AdaptiveAvgPool1d(1)  # Pool over the sequence length
 
-        # Enhanced classifier
         self.classifier = nn.Sequential(
             nn.Linear(1024, 512),
             nn.ReLU(),
