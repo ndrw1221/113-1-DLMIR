@@ -52,6 +52,12 @@ def parse_args():
     parser.add_argument(
         "--run_name", type=str, default=None, help="Unique name for the training run."
     )
+    parser.add_argument(
+        "--full_finetune",
+        type=bool,
+        default=False,
+        help="Whether to full finetune the model.",
+    )
     return parser.parse_args()
 
 
@@ -80,7 +86,11 @@ def main():
     )
 
     # Initialize model
-    model = Model(num_classes=args.num_classes, sampling_rate=args.sampling_rate)
+    model = Model(
+        num_classes=args.num_classes,
+        sampling_rate=args.sampling_rate,
+        full_finetune=args.full_finetune,
+    )
     model.to(device)
 
     # Initialize optimizer and criterion

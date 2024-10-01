@@ -4,7 +4,7 @@ from transformers import AutoModel, Wav2Vec2FeatureExtractor
 
 
 class Model(nn.Module):
-    def __init__(self, num_classes=9, sampling_rate=24000):
+    def __init__(self, num_classes=9, sampling_rate=24000, full_finetune=False):
         super(Model, self).__init__()
         # Load the pre-trained model and processor
         self.processor = Wav2Vec2FeatureExtractor.from_pretrained(
@@ -16,8 +16,9 @@ class Model(nn.Module):
         self.sampling_rate = sampling_rate
 
         # Freeze the pre-trained model's parameters
-        for param in self.feature_extractor.parameters():
-            param.requires_grad = False
+        if not full_finetune:
+            for param in self.feature_extractor.parameters():
+                param.requires_grad = False
 
         self.pooling = nn.AdaptiveAvgPool1d(1)  # Pool over the sequence length
 
