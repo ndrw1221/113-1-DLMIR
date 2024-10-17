@@ -7,30 +7,111 @@ import json
 import sklearn.preprocessing
 import numpy as np
 import random
-from git import Repo
+
+# from git import Repo
 import os
 import copy
 import torchaudio
 
-from openunmix import data
+# from openunmix import data
 from openunmix import model
 from openunmix import utils
-from openunmix import transforms
+
+# from openunmix import transforms
 
 tqdm.monitor_interval = 0
 
 
-def train(args, unmix, encoder, device, train_sampler, optimizer):
+class PrecomputedSTFTDataset(torch.utils.data.Dataset):
+    def __init__(
+        self,
+        root,
+        split="train",
+        target="vocals",
+        seq_duration=6.0,
+        samples_per_track=64,
+    ):
+        self.root = Path(root)
+        self.split = split
+        self.target = target
+        self.seq_duration = seq_duration
+        self.samples_per_track = samples_per_track
+        self.tracks = list(self.get_tracks())
+
+    def get_tracks(self):
+        # Collect all track paths in the split
+        split_folder = self.root / self.split
+        tracks = []
+        for track_folder in split_folder.iterdir():
+            if track_folder.is_dir():
+                tracks.append(track_folder)
+        return tracks
+
+    def __len__(self):
+        return len(self.tracks) * self.samples_per_track
+
+    def __getitem__(self, index):
+        track_path = self.tracks[index // self.samples_per_track]
+        # Load the precomputed magnitude spectrograms
+        X = np.load(
+            track_path / "mixture.npy", mmap_mode="r"
+        )  # Shape: (channels, freq_bins, time_frames)
+        Y = np.load(track_path / f"{self.target}.npy", mmap_mode="r")
+
+        # If seq_duration is set, extract a segment
+        if self.seq_duration is not None:
+            # Compute the number of frames per second
+            frames_per_second = 44100 // 1024  # Sample rate divided by hop length
+            seq_frames = int(self.seq_duration * frames_per_second)
+            num_time_frames = X.shape[2]
+            if num_time_frames > seq_frames:
+                # Randomly select a segment
+                start_frame = random.randint(0, num_time_frames - seq_frames)
+                X = X[:, :, start_frame : start_frame + seq_frames]
+                Y = Y[:, :, start_frame : start_frame + seq_frames]
+            else:
+                # Pad if necessary
+                pad_amount = seq_frames - num_time_frames
+                X = np.pad(X, ((0, 0), (0, 0), (0, pad_amount)), mode="constant")
+                Y = np.pad(Y, ((0, 0), (0, 0), (0, pad_amount)), mode="constant")
+
+        # Convert to torch tensors
+        X = torch.from_numpy(X).float()
+        Y = torch.from_numpy(Y).float()
+
+        return X, Y
+
+
+# def train(args, unmix, encoder, device, train_sampler, optimizer):
+#     losses = utils.AverageMeter()
+#     unmix.train()
+#     pbar = tqdm.tqdm(train_sampler, disable=args.quiet)
+#     for x, y in pbar:
+#         pbar.set_description("Training batch")
+#         x, y = x.to(device), y.to(device)
+#         optimizer.zero_grad()
+#         # X = encoder(x)
+#         # Y_hat = unmix(X)
+#         # Y = encoder(y)
+#         # loss = torch.nn.functional.mse_loss(Y_hat, Y)
+#         Y_hat = unmix(x)
+#         loss = torch.nn.functional.mse_loss(Y_hat, y)
+#         loss.backward()
+#         optimizer.step()
+#         losses.update(loss.item(), Y.size(1))
+#         pbar.set_postfix(loss="{:.3f}".format(losses.avg))
+#     return losses.avg
+
+
+def train(args, unmix, device, train_sampler, optimizer):
     losses = utils.AverageMeter()
     unmix.train()
     pbar = tqdm.tqdm(train_sampler, disable=args.quiet)
-    for x, y in pbar:
+    for X, Y in pbar:
         pbar.set_description("Training batch")
-        x, y = x.to(device), y.to(device)
+        X, Y = X.to(device), Y.to(device)
         optimizer.zero_grad()
-        X = encoder(x)
         Y_hat = unmix(X)
-        Y = encoder(y)
         loss = torch.nn.functional.mse_loss(Y_hat, Y)
         loss.backward()
         optimizer.step()
@@ -39,46 +120,88 @@ def train(args, unmix, encoder, device, train_sampler, optimizer):
     return losses.avg
 
 
-def valid(args, unmix, encoder, device, valid_sampler):
+# def valid(args, unmix, encoder, device, valid_sampler):
+#     losses = utils.AverageMeter()
+#     unmix.eval()
+#     with torch.no_grad():
+#         for x, y in valid_sampler:
+#             x, y = x.to(device), y.to(device)
+#             # X = encoder(x)
+#             # Y_hat = unmix(X)
+#             # Y = encoder(y)
+#             # loss = torch.nn.functional.mse_loss(Y_hat, Y)
+#             Y_hat = unmix(x)
+#             loss = torch.nn.functional.mse_loss(Y_hat, y)
+#             losses.update(loss.item(), Y.size(1))
+#         return losses.avg
+
+
+def valid(args, unmix, device, valid_sampler):
     losses = utils.AverageMeter()
     unmix.eval()
     with torch.no_grad():
-        for x, y in valid_sampler:
-            x, y = x.to(device), y.to(device)
-            X = encoder(x)
+        pbar = tqdm.tqdm(valid_sampler, disable=args.quiet)
+        for X, Y in pbar:
+            pbar.set_description("Validation batch")
+            X, Y = X.to(device), Y.to(device)
             Y_hat = unmix(X)
-            Y = encoder(y)
             loss = torch.nn.functional.mse_loss(Y_hat, Y)
             losses.update(loss.item(), Y.size(1))
+            pbar.set_postfix(loss="{:.3f}".format(losses.avg))
         return losses.avg
 
 
-def get_statistics(args, encoder, dataset):
-    encoder = copy.deepcopy(encoder).to("cpu")
+# def get_statistics(args, encoder, dataset):
+#     encoder = copy.deepcopy(encoder).to("cpu")
+#     scaler = sklearn.preprocessing.StandardScaler()
+
+#     dataset_scaler = copy.deepcopy(dataset)
+#     if isinstance(dataset_scaler, data.SourceFolderDataset):
+#         dataset_scaler.random_chunks = False
+#     else:
+#         dataset_scaler.random_chunks = False
+#         dataset_scaler.seq_duration = None
+
+#     dataset_scaler.samples_per_track = 1
+#     dataset_scaler.augmentations = None
+#     dataset_scaler.random_track_mix = False
+#     dataset_scaler.random_interferer_mix = False
+
+#     pbar = tqdm.tqdm(range(len(dataset_scaler)), disable=args.quiet)
+#     for ind in pbar:
+#         x, y = dataset_scaler[ind]
+#         pbar.set_description("Compute dataset statistics")
+#         # downmix to mono channel
+#         X = encoder(x[None, ...]).mean(1, keepdim=False).permute(0, 2, 1)
+
+#         scaler.partial_fit(np.squeeze(X))
+
+#     # set inital input scaler values
+#     std = np.maximum(scaler.scale_, 1e-4 * np.max(scaler.scale_))
+#     return scaler.mean_, std
+
+
+def get_statistics(args, dataset):
+    # Initialize the scaler
     scaler = sklearn.preprocessing.StandardScaler()
 
+    # Modify the dataset settings for statistics calculation
     dataset_scaler = copy.deepcopy(dataset)
-    if isinstance(dataset_scaler, data.SourceFolderDataset):
-        dataset_scaler.random_chunks = False
-    else:
-        dataset_scaler.random_chunks = False
-        dataset_scaler.seq_duration = None
-
+    dataset_scaler.seq_duration = None
     dataset_scaler.samples_per_track = 1
-    dataset_scaler.augmentations = None
-    dataset_scaler.random_track_mix = False
-    dataset_scaler.random_interferer_mix = False
 
+    # Progress bar for iterating through the dataset
     pbar = tqdm.tqdm(range(len(dataset_scaler)), disable=args.quiet)
     for ind in pbar:
-        x, y = dataset_scaler[ind]
+        x, y = dataset_scaler[ind]  # Assuming dataset returns a tuple (x, y)
         pbar.set_description("Compute dataset statistics")
-        # downmix to mono channel
-        X = encoder(x[None, ...]).mean(1, keepdim=False).permute(0, 2, 1)
 
-        scaler.partial_fit(np.squeeze(X))
+        # x is expected to have shape (nb_channels, nb_bins, nb_timesteps)
+        # Reshape x as required by the scaler
+        X = x.mean(axis=0).T
+        scaler.partial_fit(X)
 
-    # set inital input scaler values
+    # Set initial input scaler values
     std = np.maximum(scaler.scale_, 1e-4 * np.max(scaler.scale_))
     return scaler.mean_, std
 
@@ -115,8 +238,12 @@ def main():
         default="open-unmix",
         help="provide output path base folder name",
     )
-    parser.add_argument("--model", type=str, help="Name or path of pretrained model to fine-tune")
-    parser.add_argument("--checkpoint", type=str, help="Path of checkpoint to resume training")
+    parser.add_argument(
+        "--model", type=str, help="Name or path of pretrained model to fine-tune"
+    )
+    parser.add_argument(
+        "--checkpoint", type=str, help="Path of checkpoint to resume training"
+    )
     parser.add_argument(
         "--audio-backend",
         type=str,
@@ -127,7 +254,9 @@ def main():
     # Training Parameters
     parser.add_argument("--epochs", type=int, default=1000)
     parser.add_argument("--batch-size", type=int, default=16)
-    parser.add_argument("--lr", type=float, default=0.001, help="learning rate, defaults to 1e-3")
+    parser.add_argument(
+        "--lr", type=float, default=0.001, help="learning rate, defaults to 1e-3"
+    )
     parser.add_argument(
         "--patience",
         type=int,
@@ -146,7 +275,9 @@ def main():
         default=0.3,
         help="gamma of learning rate scheduler decay",
     )
-    parser.add_argument("--weight-decay", type=float, default=0.00001, help="weight decay")
+    parser.add_argument(
+        "--weight-decay", type=float, default=0.00001, help="weight decay"
+    )
     parser.add_argument(
         "--seed", type=int, default=42, metavar="S", help="random seed (default: 42)"
     )
@@ -156,7 +287,8 @@ def main():
         "--seq-dur",
         type=float,
         default=6.0,
-        help="Sequence duration in seconds" "value of <=0.0 will use full/variable length",
+        help="Sequence duration in seconds"
+        "value of <=0.0 will use full/variable length",
     )
     parser.add_argument(
         "--unidirectional",
@@ -164,7 +296,9 @@ def main():
         default=False,
         help="Use unidirectional LSTM",
     )
-    parser.add_argument("--nfft", type=int, default=4096, help="STFT fft size and window size")
+    parser.add_argument(
+        "--nfft", type=int, default=4096, help="STFT fft size and window size"
+    )
     parser.add_argument("--nhop", type=int, default=1024, help="STFT hop size")
     parser.add_argument(
         "--hidden-size",
@@ -204,14 +338,21 @@ def main():
 
     args, _ = parser.parse_known_args()
 
-    torchaudio.set_audio_backend(args.audio_backend)
+    # torchaudio.set_audio_backend(args.audio_backend)
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     print("Using GPU:", use_cuda)
-    dataloader_kwargs = {"num_workers": args.nb_workers, "pin_memory": True} if use_cuda else {}
+    # dataloader_kwargs = (
+    #     {"num_workers": args.nb_workers, "pin_memory": True} if use_cuda else {}
+    # )
+    dataloader_kwargs = (
+        {"num_workers": args.nb_workers, "pin_memory": True, "prefetch_factor": 2}
+        if use_cuda
+        else {}
+    )
 
-    repo_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    repo = Repo(repo_dir)
-    commit = repo.head.commit.hexsha[:7]
+    # repo_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    # repo = Repo(repo_dir)
+    # commit = repo.head.commit.hexsha[:7]
 
     # use jpg or npy
     torch.manual_seed(args.seed)
@@ -219,26 +360,44 @@ def main():
 
     device = torch.device("cuda" if use_cuda else "cpu")
 
-    train_dataset, valid_dataset, args = data.load_datasets(parser, args)
+    # train_dataset, valid_dataset, args = data.load_datasets(parser, args)
+    # Load datasets using the new dataset class
+    train_dataset = PrecomputedSTFTDataset(
+        root=args.root,
+        split="train",
+        target=args.target,
+        seq_duration=args.seq_dur,
+    )
+    valid_dataset = PrecomputedSTFTDataset(
+        root=args.root,
+        split="valid",
+        target=args.target,
+        samples_per_track=1,
+        seq_duration=None,  # Use full tracks for validation
+    )
 
     # create output dir if not exist
     target_path = Path(args.output)
     target_path.mkdir(parents=True, exist_ok=True)
 
     train_sampler = torch.utils.data.DataLoader(
-        train_dataset, batch_size=args.batch_size, shuffle=True, **dataloader_kwargs
+        train_dataset, batch_size=args.bnatch_size, shuffle=True, **dataloader_kwargs
     )
-    valid_sampler = torch.utils.data.DataLoader(valid_dataset, batch_size=1, **dataloader_kwargs)
+    valid_sampler = torch.utils.data.DataLoader(
+        valid_dataset, batch_size=1, **dataloader_kwargs
+    )
 
-    stft, _ = transforms.make_filterbanks(
-        n_fft=args.nfft, n_hop=args.nhop, sample_rate=train_dataset.sample_rate
-    )
-    encoder = torch.nn.Sequential(stft, model.ComplexNorm(mono=args.nb_channels == 1)).to(device)
+    # stft, _ = transforms.make_filterbanks(
+    #     n_fft=args.nfft, n_hop=args.nhop, sample_rate=train_dataset.sample_rate
+    # )
+    # encoder = torch.nn.Sequential(
+    #     stft, model.ComplexNorm(mono=args.nb_channels == 1)
+    # ).to(device)
 
     separator_conf = {
         "nfft": args.nfft,
         "nhop": args.nhop,
-        "sample_rate": train_dataset.sample_rate,
+        "sample_rate": 44100,
         "nb_channels": args.nb_channels,
     }
 
@@ -249,9 +408,12 @@ def main():
         scaler_mean = None
         scaler_std = None
     else:
-        scaler_mean, scaler_std = get_statistics(args, encoder, train_dataset)
+        # scaler_mean, scaler_std = get_statistics(args, encoder, train_dataset)
+        scaler_mean, scaler_std = get_statistics(args, train_dataset)
 
-    max_bin = utils.bandwidth_to_max_bin(train_dataset.sample_rate, args.nfft, args.bandwidth)
+    # max_bin = utils.bandwidth_to_max_bin(
+    #     train_dataset.sample_rate, args.nfft, args.bandwidth
+    # )
 
     if args.model:
         # fine tune model
@@ -267,11 +429,13 @@ def main():
             nb_bins=args.nfft // 2 + 1,
             nb_channels=args.nb_channels,
             hidden_size=args.hidden_size,
-            max_bin=max_bin,
-            unidirectional=args.unidirectional
+            # max_bin=max_bin,
+            unidirectional=args.unidirectional,
         ).to(device)
 
-    optimizer = torch.optim.Adam(unmix.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    optimizer = torch.optim.Adam(
+        unmix.parameters(), lr=args.lr, weight_decay=args.weight_decay
+    )
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
@@ -316,8 +480,10 @@ def main():
     for epoch in t:
         t.set_description("Training epoch")
         end = time.time()
-        train_loss = train(args, unmix, encoder, device, train_sampler, optimizer)
-        valid_loss = valid(args, unmix, encoder, device, valid_sampler)
+        # train_loss = train(args, unmix, encoder, device, train_sampler, optimizer)
+        # valid_loss = valid(args, unmix, encoder, device, valid_sampler)
+        train_loss = train(args, unmix, device, train_sampler, optimizer)
+        valid_loss = valid(args, unmix, device, valid_sampler)
         scheduler.step(valid_loss)
         train_losses.append(train_loss)
         valid_losses.append(valid_loss)
@@ -328,6 +494,13 @@ def main():
 
         if valid_loss == es.best:
             best_epoch = epoch
+
+        # save model weights on certain epochs
+        if epoch in [1, 5, 25, 50, 150]:
+            torch.save(
+                unmix.state_dict(),
+                os.path.join(target_path, f"{args.target}_epoch_{epoch}" + ".pth"),
+            )
 
         utils.save_checkpoint(
             {
@@ -352,7 +525,7 @@ def main():
             "valid_loss_history": valid_losses,
             "train_time_history": train_times,
             "num_bad_epochs": es.num_bad_epochs,
-            "commit": commit,
+            # "commit": commit,
         }
 
         with open(Path(target_path, args.target + ".json"), "w") as outfile:
