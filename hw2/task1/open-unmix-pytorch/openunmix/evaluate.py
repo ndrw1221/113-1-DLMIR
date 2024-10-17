@@ -9,7 +9,14 @@ import museval
 import torch
 import tqdm
 
-from openunmix import utils
+# from openunmix import utils
+import utils
+
+import warnings
+
+warnings.filterwarnings(
+    "ignore", category=RuntimeWarning, message="All-NaN slice encountered"
+)
 
 
 def separate_and_evaluate(
@@ -52,8 +59,24 @@ def separate_and_evaluate(
     if output_dir:
         mus.save_estimates(estimates, track, output_dir)
 
-    scores = museval.eval_mus_track(track, estimates, output_dir=eval_dir)
-    return scores
+    data = museval.TrackStore(track_name=track.name)
+
+    # scores = museval.eval_mus_track(track, estimates, output_dir=eval_dir)
+    SDR, ISR, SIR, SAR = museval.evaluate(
+        [track.targets["vocals"].audio], [estimates["vocals"]]
+    )
+
+    values = {
+        "SDR": SDR[0].tolist(),
+        "SIR": SIR[0].tolist(),
+        "ISR": ISR[0].tolist(),
+        "SAR": SAR[0].tolist(),
+    }
+
+    data.add_target(target_name="vocals", values=values)
+
+    return data
+    # return scores
 
 
 if __name__ == "__main__":
@@ -82,15 +105,21 @@ if __name__ == "__main__":
         help="Results path where audio evaluation results are stored",
     )
 
-    parser.add_argument("--evaldir", type=str, help="Results path for museval estimates")
+    parser.add_argument(
+        "--evaldir", type=str, help="Results path for museval estimates"
+    )
 
     parser.add_argument("--root", type=str, help="Path to MUSDB18")
 
-    parser.add_argument("--subset", type=str, default="test", help="MUSDB subset (`train`/`test`)")
+    parser.add_argument(
+        "--subset", type=str, default="test", help="MUSDB subset (`train`/`test`)"
+    )
 
     parser.add_argument("--cores", type=int, default=1)
 
-    parser.add_argument("--no-cuda", action="store_true", default=False, help="disables CUDA inference")
+    parser.add_argument(
+        "--no-cuda", action="store_true", default=False, help="disables CUDA inference"
+    )
 
     parser.add_argument(
         "--is-wav",
@@ -117,7 +146,8 @@ if __name__ == "__main__":
         "--residual",
         type=str,
         default=None,
-        help="if provided, build a source with given name" "for the mix minus all estimated targets",
+        help="if provided, build a source with given name"
+        "for the mix minus all estimated targets",
     )
 
     parser.add_argument(
@@ -172,7 +202,8 @@ if __name__ == "__main__":
 
     else:
         results = museval.EvalStore()
-        for track in tqdm.tqdm(mus.tracks):
+        pbar = tqdm.tqdm(total=len(mus.tracks))
+        for track in mus.tracks:
             scores = separate_and_evaluate(
                 track,
                 targets=args.targets,
@@ -185,7 +216,9 @@ if __name__ == "__main__":
                 eval_dir=args.evaldir,
                 device=device,
             )
-            print(track, "\n", scores)
+            # print(track, "\n", scores)
+            pbar.write(f"{track}\n{scores}")
+            pbar.update(1)
             results.add_track(scores)
 
     print(results)
