@@ -45,6 +45,7 @@ def save_checkpoint(state: dict, is_best: bool, path: str, target: str):
     """
     # save full checkpoint including optimizer
     torch.save(state, os.path.join(path, target + ".chkpnt"))
+
     if is_best:
         # save just the weights
         torch.save(state["state_dict"], os.path.join(path, target + ".pth"))
@@ -112,7 +113,9 @@ class EarlyStopping(object):
             self.is_better = lambda a, best: a > best + min_delta
 
 
-def load_target_models(targets, model_str_or_path="umxl", device="cpu", pretrained=True):
+def load_target_models(
+    targets, model_str_or_path="umxl", device="cpu", pretrained=True
+):
     """Core model loader
 
     target model path can be either <target>.pth, or <target>-sha256.pth
@@ -145,7 +148,11 @@ def load_target_models(targets, model_str_or_path="umxl", device="cpu", pretrain
                 results = json.load(stream)
 
             target_model_path = next(Path(model_path).glob("%s*.pth" % target))
-            state = torch.load(target_model_path, map_location=device)
+            state = torch.load(
+                target_model_path,
+                weights_only=True,
+                map_location=device,
+            )
 
             models[target] = model.OpenUnmix(
                 nb_bins=results["args"]["nfft"] // 2 + 1,
@@ -212,7 +219,9 @@ def load_separator(
         if targets is None:
             raise UserWarning("For custom models, please specify the targets")
 
-        target_models = load_target_models(targets=targets, model_str_or_path=model_path, pretrained=pretrained)
+        target_models = load_target_models(
+            targets=targets, model_str_or_path=model_path, pretrained=pretrained
+        )
 
         with open(Path(model_path, "separator.json"), "r") as stream:
             enc_conf = json.load(stream)
@@ -286,7 +295,9 @@ def preprocess(
         # swapping channel and time
         audio = audio.transpose(1, 2)
     if audio.shape[1] > 2:
-        warnings.warn("Channel count > 2!. Only the first two channels " "will be processed!")
+        warnings.warn(
+            "Channel count > 2!. Only the first two channels " "will be processed!"
+        )
         audio = audio[..., :2]
 
     if audio.shape[1] == 1:
