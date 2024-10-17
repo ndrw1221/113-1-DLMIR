@@ -62,7 +62,9 @@ def load_audio(
             info = load_info(path)
         num_frames = int(dur * info["samplerate"])
         frame_offset = int(start * info["samplerate"])
-        sig, rate = torchaudio.load(path, num_frames=num_frames, frame_offset=frame_offset)
+        sig, rate = torchaudio.load(
+            path, num_frames=num_frames, frame_offset=frame_offset
+        )
         return sig, rate
 
 
@@ -88,7 +90,9 @@ class Compose(object):
         return audio
 
 
-def _augment_gain(audio: torch.Tensor, low: float = 0.25, high: float = 1.25) -> torch.Tensor:
+def _augment_gain(
+    audio: torch.Tensor, low: float = 0.25, high: float = 1.25
+) -> torch.Tensor:
     """Applies a random gain between `low` and `high`"""
     g = low + torch.rand(1) * (high - low)
     return audio * g
@@ -169,8 +173,12 @@ def load_datasets(
             "output_file": args.output_file,
         }
         args.target = Path(args.output_file).stem
-        train_dataset = AlignedDataset(split="train", random_chunks=True, **dataset_kwargs)  # type: UnmixDataset
-        valid_dataset = AlignedDataset(split="valid", **dataset_kwargs)  # type: UnmixDataset
+        train_dataset = AlignedDataset(
+            split="train", random_chunks=True, **dataset_kwargs
+        )  # type: UnmixDataset
+        valid_dataset = AlignedDataset(
+            split="valid", **dataset_kwargs
+        )  # type: UnmixDataset
 
     elif args.dataset == "sourcefolder":
         parser.add_argument("--interferer-dirs", type=str, nargs="+")
@@ -238,7 +246,9 @@ def load_datasets(
             seq_duration=args.seq_dur,
             **dataset_kwargs,
         )
-        valid_dataset = FixedSourcesTrackFolderDataset(split="valid", seq_duration=None, **dataset_kwargs)
+        valid_dataset = FixedSourcesTrackFolderDataset(
+            split="valid", seq_duration=None, **dataset_kwargs
+        )
 
     elif args.dataset == "trackfolder_var":
         parser.add_argument("--ext", type=str, default=".wav")
@@ -267,7 +277,9 @@ def load_datasets(
             "silence_missing_targets": args.silence_missing,
         }
 
-        source_augmentations = Compose([globals()["_augment_" + aug] for aug in args.source_augmentations])
+        source_augmentations = Compose(
+            [globals()["_augment_" + aug] for aug in args.source_augmentations]
+        )
 
         train_dataset = VariableSourcesTrackFolderDataset(
             split="train",
@@ -277,7 +289,9 @@ def load_datasets(
             seq_duration=args.seq_dur,
             **dataset_kwargs,
         )
-        valid_dataset = VariableSourcesTrackFolderDataset(split="valid", seq_duration=None, **dataset_kwargs)
+        valid_dataset = VariableSourcesTrackFolderDataset(
+            split="valid", seq_duration=None, **dataset_kwargs
+        )
 
     else:
         parser.add_argument(
@@ -287,7 +301,12 @@ def load_datasets(
             help="loads wav instead of STEMS",
         )
         parser.add_argument("--samples-per-track", type=int, default=64)
-        parser.add_argument("--source-augmentations", type=str, default=["gain", "channelswap"], nargs="+")
+        parser.add_argument(
+            "--source-augmentations",
+            type=str,
+            default=["gain", "channelswap"],
+            nargs="+",
+        )
 
         args = parser.parse_args()
         dataset_kwargs = {
@@ -310,7 +329,9 @@ def load_datasets(
             **dataset_kwargs,
         )
 
-        valid_dataset = MUSDBDataset(split="valid", samples_per_track=1, seq_duration=None, **dataset_kwargs)
+        valid_dataset = MUSDBDataset(
+            split="valid", samples_per_track=1, seq_duration=None, **dataset_kwargs
+        )
 
     return train_dataset, valid_dataset, args
 
@@ -392,7 +413,9 @@ class AlignedDataset(UnmixDataset):
                     if self.seq_duration is not None:
                         input_info = load_info(input_path[0])
                         output_info = load_info(output_path[0])
-                        min_duration = min(input_info["duration"], output_info["duration"])
+                        min_duration = min(
+                            input_info["duration"], output_info["duration"]
+                        )
                         # check if both targets are available in the subfolder
                         if min_duration > self.seq_duration:
                             yield input_path[0], output_path[0]
@@ -574,7 +597,9 @@ class FixedSourcesTrackFolderDataset(UnmixDataset):
         # assemble the mixture of target and interferers
         audio_sources = []
         # load target
-        target_audio, _ = load_audio(track_path / self.target_file, start=start, dur=self.seq_duration)
+        target_audio, _ = load_audio(
+            track_path / self.target_file, start=start, dur=self.seq_duration
+        )
         target_audio = self.source_augmentations(target_audio)
         audio_sources.append(target_audio)
         # load interferers
@@ -587,7 +612,9 @@ class FixedSourcesTrackFolderDataset(UnmixDataset):
                     min_duration = self.tracks[random_idx]["min_duration"]
                     start = random.uniform(0, min_duration - self.seq_duration)
 
-            audio, _ = load_audio(track_path / source, start=start, dur=self.seq_duration)
+            audio, _ = load_audio(
+                track_path / source, start=start, dur=self.seq_duration
+            )
             audio = self.source_augmentations(audio)
             audio_sources.append(audio)
 
@@ -706,7 +733,9 @@ class VariableSourcesTrackFolderDataset(UnmixDataset):
                 continue
 
             try:
-                audio, _ = load_audio(source_path, start=intfr_start, dur=self.seq_duration)
+                audio, _ = load_audio(
+                    source_path, start=intfr_start, dur=self.seq_duration
+                )
             except RuntimeError:
                 index = index - 1 if index > 0 else index + 1
                 return self.__getitem__(index)
@@ -736,7 +765,10 @@ class VariableSourcesTrackFolderDataset(UnmixDataset):
         for track_path in tqdm.tqdm(p.iterdir()):
             if track_path.is_dir():
                 # check if target exists
-                if Path(track_path, self.target_file).exists() or self.silence_missing_targets:
+                if (
+                    Path(track_path, self.target_file).exists()
+                    or self.silence_missing_targets
+                ):
                     sources = sorted(list(track_path.glob("*" + self.ext)))
                     if not sources:
                         # in case of empty folder
@@ -853,9 +885,13 @@ class MUSDBDataset(UnmixDataset):
 
                 track.chunk_duration = self.seq_duration
                 # set random start position
-                track.chunk_start = random.uniform(0, track.duration - self.seq_duration)
+                track.chunk_start = random.uniform(
+                    0, track.duration - self.seq_duration
+                )
                 # load source audio and apply time domain source_augmentations
-                audio = torch.as_tensor(track.sources[source].audio.T, dtype=torch.float32)
+                audio = torch.as_tensor(
+                    track.sources[source].audio.T, dtype=torch.float32
+                )
                 audio = self.source_augmentations(audio)
                 audio_sources.append(audio)
 
@@ -903,7 +939,9 @@ if __name__ == "__main__":
 
     parser.add_argument("--root", type=str, help="root path of dataset")
 
-    parser.add_argument("--save", action="store_true", help=("write out a fixed dataset of samples"))
+    parser.add_argument(
+        "--save", action="store_true", help=("write out a fixed dataset of samples")
+    )
 
     parser.add_argument("--target", type=str, default="vocals")
     parser.add_argument("--seed", type=int, default=42)
