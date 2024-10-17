@@ -97,3 +97,7 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# Added by Me for DLMIR2024 HW2
+*.sh
+scripts/open-unmix*
