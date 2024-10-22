@@ -66,10 +66,12 @@ def compute_sdr(estimates, target):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--epoch", type=int, default=137)
+    parser.add_argument("--root", type=str, required=True)
     args = parser.parse_args()
     epoch = args.epoch
     print(f"Using epoch: {epoch}")
-    test_split_path = "/home/ndrw1221/nas/datasets/musdb18hq-dataset/test"
+    # test_split_path = "/home/ndrw1221/nas/datasets/musdb18hq-dataset/test"
+    test_split_path = args.root
     model_path = f"../scripts/open-unmix/vocals_epoch_{epoch}.pth"
     save_dir = f"results-griffinlim/epoch_{epoch}"
     os.makedirs(save_dir, exist_ok=True)
