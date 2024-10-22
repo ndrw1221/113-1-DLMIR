@@ -12,7 +12,12 @@ import tqdm
 # from openunmix import utils
 import utils
 
+import pdb
+import mir_eval
 import warnings
+import numpy as np
+import datetime
+import pytz
 
 warnings.filterwarnings(
     "ignore", category=RuntimeWarning, message="All-NaN slice encountered"
@@ -59,23 +64,31 @@ def separate_and_evaluate(
     if output_dir:
         mus.save_estimates(estimates, track, output_dir)
 
-    data = museval.TrackStore(track_name=track.name)
+    # data = museval.TrackStore(track_name=track.name)
+
+    # pdb.set_trace()
+
+    # results = {}
 
     # scores = museval.eval_mus_track(track, estimates, output_dir=eval_dir)
-    SDR, ISR, SIR, SAR = museval.evaluate(
+    SDR, _, _, _ = museval.evaluate(
         [track.targets["vocals"].audio], [estimates["vocals"]]
     )
 
-    values = {
-        "SDR": SDR[0].tolist(),
-        "SIR": SIR[0].tolist(),
-        "ISR": ISR[0].tolist(),
-        "SAR": SAR[0].tolist(),
-    }
+    # results[track.name] = np.median(SDR[0].tolist())
 
-    data.add_target(target_name="vocals", values=values)
+    # pdb.set_trace()
 
-    return data
+    # values = {
+    #     "SDR": SDR[0].tolist(),
+    #     "SIR": SIR[0].tolist(),
+    #     "ISR": ISR[0].tolist(),
+    #     "SAR": SAR[0].tolist(),
+    # }
+
+    # data.add_target(target_name="vocals", values=values)
+
+    return np.median(SDR[0].tolist())
     # return scores
 
 
@@ -201,10 +214,11 @@ if __name__ == "__main__":
             results.add_track(scores)
 
     else:
-        results = museval.EvalStore()
+        # results = museval.EvalStore()
+        results = {}
         pbar = tqdm.tqdm(total=len(mus.tracks))
         for track in mus.tracks:
-            scores = separate_and_evaluate(
+            SDR = separate_and_evaluate(
                 track,
                 targets=args.targets,
                 model_str_or_path=args.model,
@@ -217,11 +231,20 @@ if __name__ == "__main__":
                 device=device,
             )
             # print(track, "\n", scores)
-            pbar.write(f"{track}\n{scores}")
+            pbar.write(f"{track}: {SDR}")
             pbar.update(1)
-            results.add_track(scores)
+            results[track.name] = SDR
+            # results.add_track(scores)
 
-    print(results)
-    method = museval.MethodStore()
-    method.add_evalstore(results, args.model)
-    method.save(args.model + ".pandas")
+    data = list(results.values())
+    total_median = np.median(data)
+    data["Median of all"] = total_median
+    tz = pytz.timezone("Asia/Taipei")
+    filename = f"{datetime.now(tz).strftime('%Y-%m-%d-%H-%M-%S')}.json"
+
+    with open(filename, "w") as f:
+        json.dump(results, f)
+    # print(results)
+    # method = museval.MethodStore()
+    # method.add_evalstore(results, args.model)
+    # method.save(args.model + ".pandas")
