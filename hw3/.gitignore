@@ -2,3 +2,4 @@ checkpoints/
 __pychcache__/
 *.pyc
 *.csv
+generated_midi/
