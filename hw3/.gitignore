@@ -1,3 +1,4 @@
 checkpoints/
 __pychcache__/
 *.pyc
+*.csv
