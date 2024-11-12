@@ -36,7 +36,10 @@ def parse_opt():
     parser = argparse.ArgumentParser()
     # training opts
     parser.add_argument(
-        "--dict_path", type=str, help="the dictionary path", required=True
+        "--dict_path",
+        type=str,
+        help="the dictionary path",
+        default="tutorial/basic_event_dictionary.pkl",
     )
     parser.add_argument(
         "--output_file_path", type=str, help="the output file path.", required=True
@@ -198,6 +201,12 @@ if __name__ == "__main__":
         gs = compute_piece_groove_similarity(seq)
         result_dict["GS"].append(gs)
 
+    result_dict["piece_name"].append("average")
+    result_dict["H1"].append(np.mean(result_dict["H1"]))
+    result_dict["H4"].append(np.mean(result_dict["H4"]))
+    result_dict["GS"].append(np.mean(result_dict["GS"]))
+
     if len(result_dict):
+        output_name = opt.output_file_path.split("/")[-1]
         df = pd.DataFrame.from_dict(result_dict)
-        df.to_csv("pop1k7.csv", index=False, encoding="utf-8")
+        df.to_csv(f"{output_name}.csv", index=False, encoding="utf-8")
