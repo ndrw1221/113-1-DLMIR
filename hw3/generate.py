@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 
 def load_tokenizer():
-    """Load the trained tokenizer."""
+    """Load the tokenizer."""
     config = TokenizerConfig(
         num_velocities=32,
         use_chords=True,
@@ -43,16 +43,52 @@ def load_model(checkpoint_path, tokenizer):
     return model
 
 
-def get_random_priming_sequence(tokenizer):
-    """Select a random MIDI file, tokenize it, and use it as a priming sequence."""
-    midi_paths = list(
-        Path("/home/ndrw1221/nas/datasets/pop1k7/Pop1K7/midi_analyzed").glob("**/*.mid")
-    )
-    random_midi_path = random.choice(midi_paths)
-    tokens = tokenizer(random_midi_path)
-    input_ids = tokens[0].ids
-    # Limit the length of the priming sequence if necessary
-    return input_ids[:512]  # Limit to 512 tokens if longer
+def get_token_ids_by_prefix(tokenizer, prefix):
+    """Retrieve token IDs from the tokenizer's vocab based on a given prefix."""
+    return [
+        token_id
+        for token, token_id in tokenizer.vocab.items()
+        if token.startswith(prefix)
+    ]
+
+
+def get_random_priming_sequence(tokenizer, seq_length=512):
+    """Generate a random REMI token sequence to use as a priming sequence."""
+    # Step 1: Retrieve token IDs for each type
+    pitch_tokens = get_token_ids_by_prefix(tokenizer, "Pitch_")
+    velocity_tokens = get_token_ids_by_prefix(tokenizer, "Velocity_")
+    duration_tokens = get_token_ids_by_prefix(tokenizer, "Duration_")
+    rest_tokens = get_token_ids_by_prefix(tokenizer, "Rest_")
+    chord_tokens = get_token_ids_by_prefix(tokenizer, "Chord_")
+    tempo_tokens = get_token_ids_by_prefix(tokenizer, "Tempo_")
+
+    # Step 2: Initialize the sequence with BOS
+    sequence = [tokenizer["BOS_None"]]
+
+    # Step 3: Randomly fill the sequence with various tokens, ensuring diversity
+    for _ in range(seq_length - 2):
+        token_type = random.choices(
+            ["pitch", "velocity", "duration", "rest", "chord", "tempo"],
+            weights=[0.4, 0.2, 0.2, 0.1, 0.05, 0.05],
+        )[0]
+
+        if token_type == "pitch":
+            sequence.append(random.choice(pitch_tokens))
+        elif token_type == "velocity":
+            sequence.append(random.choice(velocity_tokens))
+        elif token_type == "duration":
+            sequence.append(random.choice(duration_tokens))
+        elif token_type == "rest":
+            sequence.append(random.choice(rest_tokens))
+        elif token_type == "chord":
+            sequence.append(random.choice(chord_tokens))
+        elif token_type == "tempo":
+            sequence.append(random.choice(tempo_tokens))
+
+    # Step 4: Add Bar_None at the end
+    sequence.append(tokenizer["Bar_None"])
+
+    return sequence
 
 
 def generate_midi(model, tokenizer, priming_seq, max_bars=32):
@@ -74,7 +110,7 @@ def generate_midi(model, tokenizer, priming_seq, max_bars=32):
                 input_ids=torch.tensor([input_ids], dtype=torch.long).to(device),
                 max_new_tokens=1,
                 do_sample=True,
-                top_k=50,
+                top_k=10,
                 top_p=0.95,
                 temperature=1.0,
                 pad_token_id=tokenizer.pad_token_id,
@@ -108,23 +144,24 @@ def save_midi(midi, output_path):
 def main():
     # Load tokenizer and model
     tokenizer = load_tokenizer()
-    checkpoint_path = Path("checkpoints", "epoch_100.pkl")
+    checkpoint_path = Path("checkpoints", "epoch_055.pkl")
     model = load_model(checkpoint_path, tokenizer)
 
-    assert model.config.vocab_size == len(tokenizer), "Vocab size mismatch!"
+    for i in range(20):
+        print(f"Generating MIDI {i+1}")
+        # Get a random priming sequence
+        priming_seq = get_random_priming_sequence(tokenizer)
 
-    # Get a random priming sequence
-    priming_seq = get_random_priming_sequence(tokenizer)
+        # Generate MIDI with exactly 32 bars
+        generated_midi = generate_midi(model, tokenizer, priming_seq, max_bars=32)
 
-    # Generate MIDI with exactly 32 bars
-    print("Generating MIDI with 32 bars...")
-    generated_midi = generate_midi(model, tokenizer, priming_seq, max_bars=32)
-
-    # Save the generated MIDI to a file
-    output_path = Path("generated_midi", "generated_32_bars.mid")
-    output_path.parent.mkdir(exist_ok=True, parents=True)
-    save_midi(generated_midi, output_path)
-    print(f"MIDI saved to {output_path}")
+        # Save the generated MIDI to a file
+        output_path = Path(
+            "generated_midi", "epoch55_topk10_topp0.95_temperature1.0", f"{i+1}.mid"
+        )
+        output_path.parent.mkdir(exist_ok=True, parents=True)
+        save_midi(generated_midi, output_path)
+        print(f"MIDI saved to {output_path}")
 
 
 if __name__ == "__main__":
