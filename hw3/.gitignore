@@ -3,7 +3,7 @@ __pychcache__/
 *.pyc
 *.csv
 generated_midi/
+synthesized_audio/
 *.sf2
 *.SF2
 *.wav
-*.png
